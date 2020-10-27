@@ -1,83 +1,4 @@
-//Parametrs
-
 const form = document.querySelector("#form-news");
-
-// Custom Http Module
-function customHttp() {
-  return {
-    get(url, cb) {
-      try {
-        const xhr = new XMLHttpRequest();
-        xhr.open("GET", url);
-        xhr.addEventListener("load", () => {
-          if (Math.floor(xhr.status / 100) !== 2) {
-            cb(`Error. Status code: ${xhr.status}`, xhr);
-            return;
-          }
-          const response = JSON.parse(xhr.responseText);
-          cb(null, response);
-        });
-
-        xhr.addEventListener("error", () => {
-          cb(`Error. Status code: ${xhr.status}`, xhr);
-        });
-
-        xhr.send();
-      } catch (error) {
-        cb(error, response);
-      }
-    },
-    post(url, body, headers, cb) {
-      try {
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", url);
-        xhr.addEventListener("load", () => {
-          if (Math.floor(xhr.status / 100) !== 2) {
-            cb(`Error. Status code: ${xhr.status}`, xhr);
-            return;
-          }
-          const response = JSON.parse(xhr.responseText);
-          cb(null, response);
-        });
-
-        xhr.addEventListener("error", () => {
-          cb(`Error. Status code: ${xhr.status}`, xhr);
-        });
-
-        if (headers) {
-          Object.entries(headers).forEach(([key, value]) => {
-            xhr.setRequestHeader(key, value);
-          });
-        }
-
-        xhr.send(JSON.stringify(body));
-      } catch (error) {
-        cb(error);
-      }
-    },
-  };
-}
-
-// Init http module
-const http = customHttp();
-
-const newsService = (function () {
-  const apiKey = "766dfec616ec4728a0e504222d45f4ee";
-  // const apiUrl = "http://newsapi.org/v2";
-  const apiUrl = "https://news-api-v2.herokuapp.com";
-
-  return {
-    topHeadlines(country = "ua", category = "general", cb) {
-      http.get(
-        `${apiUrl}/top-headlines?country=${country}&category=${category}&apiKey=${apiKey}`,
-        cb
-      );
-    },
-    everithing(query, cb) {
-      http.get(`${apiUrl}/everything?q=${query}&apiKey=${apiKey}`, cb);
-    },
-  };
-})();
 
 //  init selects
 document.addEventListener("DOMContentLoaded", function () {
@@ -85,9 +6,45 @@ document.addEventListener("DOMContentLoaded", function () {
   loadNews();
 });
 
-form.addEventListener("submit", submitHandler);
+function customHttp() {
+  return {
+    async get(url) {
+      try {
+        const response = await fetch(url)
+          .then((resp) => resp.json())
+          .catch((err) =>
+            console.log(`Error GET from fetch from MyHttp: ${err}`)
+          );
+        // console.log(response);
+        return response;
+      } catch (err) {
+        throw `Error GET from catch myHttp: ${err}`;
+      }
+    },
+    async post(url, body) {
+      try {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json;charset=utf-8",
+          },
+          body: JSON.stringify(body),
+        })
+          .then((response) => response.json())
+          .catch((err) =>
+            console.log(`Error POST from fetch from MyHttp: ${err}`)
+          );
+        return response;
+      } catch (err) {
+        throw `Error POST from catch myHttp: ${err}`;
+      }
+    },
+  };
+}
 
-//Load news fn
+const http = customHttp();
+
+form.addEventListener("submit", submitHandler);
 
 function submitHandler(e) {
   e.preventDefault();
@@ -95,7 +52,6 @@ function submitHandler(e) {
   if (!search) {
     let countryVal = document.querySelector("#country").value;
     let categoryVal = document.querySelector("#category").value;
-    console.log(categoryVal, countryVal);
     loadNews(countryVal, categoryVal);
   } else {
     loadNewsQuery(search);
@@ -103,49 +59,80 @@ function submitHandler(e) {
   }
 }
 
+const newsService = (function () {
+  const apiKey = "766dfec616ec4728a0e504222d45f4ee";
+  const apiUrl = "https://news-api-v2.herokuapp.com";
+
+  return {
+    topHeadlines(country = "ua", category = "general") {
+      return http.get(
+        `${apiUrl}/top-headlines?country=${country}&category=${category}&apiKey=${apiKey}`
+      );
+    },
+    everithing(query) {
+      return http.get(
+        `${apiUrl}/everything?q=${query}&language=ru&apiKey=${apiKey}`
+      );
+    },
+  };
+})();
+
 function loadNews(country, category) {
-  newsService.topHeadlines(country, category, onGetResponse);
+  newsService
+    .topHeadlines(country, category)
+    .then((res) => renderNews(res.articles))
+    .catch((err) => console.log(`Error loadNews: ${err}`));
 }
-
 function loadNewsQuery(query) {
-  newsService.everithing(query, onGetResponse);
+  newsService
+    .everithing(query)
+    .then((res) => renderNews(res.articles))
+    .catch((err) => console.log(`Error loadNewsQuery: ${err}`));
 }
 
-// function on get response server
-function onGetResponse(err, res) {
-  renderNews(res.articles);
-}
-
-// function render news
 function renderNews(news) {
   const newsContainer = document.querySelector(".news-container .row");
+  if (newsContainer.children.length > 0) {
+    newsContainer.innerHTML = "";
+  }
   let fragment = "";
   news.forEach((newsItem) => {
     const el = newsTemplate(newsItem);
     fragment += el;
   });
 
-  // console.log(fragment);
   newsContainer.insertAdjacentHTML("afterbegin", fragment);
 }
 
 // News item template function
 function newsTemplate({ urlToImage, title, url, description }) {
-  // console.log(news);
-  return `
-  <div class="col s12">
+  console.log(urlToImage, title, url, description);
+  try {
+    return `
+    <div class="col s12">
     <div class="card">
     <div class="card-image">
-      <img src="${urlToImage || "zaglushka.jpg"}">
-      <span class="card-title">${title || ""}</span>
+    <img src="${zaglushka(urlToImage)}">
+    <span class="card-title">${title || ""}</span>
     </div>
     <div class="card-content">
-      <p>${description || ""}</p>
+    <p>${description || ""}</p>
     </div>
     <div class="card-action">
-      <a href="${url}">Read more</a>
+    <a href="${url}">Read more</a>
     </div>
     </div>
-  </div>
-  `;
+    </div>
+    `;
+  } catch (err) {
+    throw `Template Error:${err}`;
+  }
+}
+
+function zaglushka(urlToImage) {
+  const str = "http";
+  if (!urlToImage || !urlToImage.includes(str) || urlToImage.length < 10) {
+    return "zaglushka.jpg";
+  }
+  return urlToImage;
 }
